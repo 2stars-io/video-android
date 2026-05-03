@@ -1,0 +1,6 @@
+# JitPack build config — installs JDK 17 (AGP 8 requires it) and tells
+# JitPack which Gradle task produces the publishable artifact.
+jdk:
+  - openjdk17
+install:
+  - ./gradlew :library:publishToMavenLocal
