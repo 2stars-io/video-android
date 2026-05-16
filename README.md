@@ -86,7 +86,13 @@ Requires JDK 17 (set `JAVA_HOME` to a JBR 17 or any OpenJDK 17 — AGP 8.2 is in
 
 ## Versioning
 
-Current: **0.5.1** — A2 + A4 + A5 + A6 capabilities shipped (media plane, E2E messaging, screen share, AI in-call). A7 / Whiteboard / Avatar are not yet implemented on Android. **E2E media-frame encryption (SFrame) is deferred to v0.6.0** — needs a native JNI bridge; the JS and Web SDKs have the full implementation today.
+Current: **0.5.1** — full feature parity with the JS / React SDKs except for two items:
+
+**Shipped**: P2P + SFU media plane, screen share, **whiteboard** (Whiteboard.kt + WhiteboardEditor), E2E **messaging**, transcription, translation (text + voice), **AI assistant** ("Hebbs"), wake word, correction, fact check, virtual backgrounds, auto-frame, tint frame processor, remote control, foreground service (Doze-safe).
+
+**Deferred** (planned for v0.6.0):
+- **Avatar mode** — AI-rendered participant avatar. The JS SDK has it via MediaPipe + Gemini; Android needs the equivalent pipeline.
+- **E2E media-frame encryption (SFrame)** — libwebrtc's FrameEncryptor interface is JNI-only on Android, so a pure-Kotlin path needs an accompanying native bridge. The JS / Web SDKs have full E2E media today; Android still does E2E *messaging* (Message.kt) but media frames go unencrypted until v0.6.
 
 ## License
 
