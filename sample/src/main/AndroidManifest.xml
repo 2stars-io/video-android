@@ -2,17 +2,35 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!--
+      Sample-only permissions. The SDK's library manifest already
+      declares INTERNET, CAMERA, RECORD_AUDIO, the FOREGROUND_SERVICE_*
+      family, and POST_NOTIFICATIONS, plus the CallForegroundService
+      itself — the manifest merger pulls them into this app.
+    -->
 
     <application
         android:label="2Stars Sample"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar"
-        android:usesCleartextTraffic="false"
+        android:usesCleartextTraffic="true"
         tools:targetApi="34">
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode">
+            <!--
+              Standard video-conferencing pattern: handle these config
+              changes ourselves so the activity is NOT destroyed +
+              recreated on rotation, soft-keyboard show/hide, dark-mode
+              toggle, or multi-window resize. Without this, every
+              rotation tears down the SurfaceViewRenderer + PeerConnection
+              graph + camera capture and forces the user to re-connect.
+
+              The flip side: we have to react to the rotation ourselves
+              if we want different layouts per orientation. The current
+              activity uses a single LinearLayout that adapts to both,
+              so no extra work is needed.
+            -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

@@ -4,4 +4,49 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!--
+      Media-plane permissions. Listed in the library manifest so consumers
+      get them merged automatically into their app manifests via the
+      manifest merger; they still need to request the runtime permissions
+      themselves before calling Room.publish() on Android 6.0+.
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!--
+      Foreground-service permissions for CallForegroundService. Merged
+      into consumer manifests automatically; the host app does NOT need
+      to redeclare them. POST_NOTIFICATIONS is a runtime permission on
+      API 33+ that the host app should request before starting a call
+      if it wants the notification to be visible.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Hardware features the SDK uses; declared as not-required so an
+         emulator without a back camera can still run the sample. -->
+    <uses-feature android:name="android.hardware.camera"     android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
+    <application>
+        <!--
+          Public foreground service the SDK provides for hosting an
+          active call. The union of foregroundServiceType bits covers
+          everything the SDK can do (camera, mic, screen capture); the
+          actual bits passed to startForeground() are decided at
+          runtime, so apps that never use screen share still benefit
+          from a single, stable notification across the call.
+        -->
+        <service
+            android:name="io.twostars.sdk.CallForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="camera|microphone|mediaProjection" />
+    </application>
+
 </manifest>

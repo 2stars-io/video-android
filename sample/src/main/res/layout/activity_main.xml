@@ -1,100 +1,547 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp">
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="2Stars SDK — A1 sample"
-        android:textSize="20sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="12dp"/>
-
-    <EditText
-        android:id="@+id/baseUrlInput"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Base URL (defaults to https://video-api.2stars.io)"
-        android:inputType="textUri"/>
-
-    <EditText
-        android:id="@+id/tokenInput"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Participant JWT"
-        android:inputType="textNoSuggestions"
-        android:singleLine="true"/>
-
-    <EditText
-        android:id="@+id/roomCodeInput"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Room code (e.g. abc-defg-hij)"
-        android:inputType="textNoSuggestions"
-        android:singleLine="true"/>
+    android:layout_height="match_parent">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginTop="8dp">
-        <Button
-            android:id="@+id/connectBtn"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Connect + join"/>
-        <Button
-            android:id="@+id/leaveBtn"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:text="Leave"/>
-    </LinearLayout>
+        android:orientation="vertical"
+        android:padding="16dp">
 
-    <TextView
-        android:id="@+id/statusText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:text="Idle"
-        android:textStyle="italic"/>
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Peers in room"
-        android:textStyle="bold"/>
-    <TextView
-        android:id="@+id/peersList"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:minHeight="80dp"
-        android:textIsSelectable="true"/>
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Events"
-        android:textStyle="bold"/>
-    <ScrollView
-        android:id="@+id/eventsScroll"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
         <TextView
-            android:id="@+id/eventsLog"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:fontFamily="monospace"
-            android:textSize="12sp"
-            android:textIsSelectable="true"/>
-    </ScrollView>
+            android:text="2Stars SDK — A2 sample"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="12dp"/>
 
-</LinearLayout>
+        <EditText
+            android:id="@+id/baseUrlInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Base URL"
+            android:text="http://34.142.79.105"
+            android:inputType="textUri"/>
+
+        <EditText
+            android:id="@+id/tokenInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Participant JWT (use Quick demo to mint one)"
+            android:inputType="textNoSuggestions"
+            android:singleLine="true"/>
+
+        <EditText
+            android:id="@+id/roomCodeInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Room code (use Quick demo to mint one)"
+            android:inputType="textNoSuggestions"
+            android:singleLine="true"/>
+
+        <EditText
+            android:id="@+id/displayNameInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Display name (optional)"
+            android:text="Phone"
+            android:inputType="textNoSuggestions"
+            android:singleLine="true"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
+            <Button
+                android:id="@+id/quickDemoBtn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1.4"
+                android:text="⚡ Quick demo"
+                android:backgroundTint="#5fa8ff"
+                android:textColor="#ffffff"/>
+            <Button
+                android:id="@+id/connectBtn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                android:text="Connect"/>
+            <Button
+                android:id="@+id/leaveBtn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                android:text="Leave"/>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Idle"
+            android:textStyle="italic"/>
+
+        <!-- Self tile, full width, on top. -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:layout_marginTop="12dp"
+            android:background="#111111">
+            <org.webrtc.SurfaceViewRenderer
+                android:id="@+id/selfRenderer"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|start"
+                android:layout_margin="6dp"
+                android:padding="4dp"
+                android:background="#88000000"
+                android:textColor="#ffffff"
+                android:textSize="11sp"
+                android:text="You"/>
+        </FrameLayout>
+
+        <!-- Peers row — dynamically populated from room.peers. Each
+             entry is a labeled SurfaceViewRenderer. Horizontal scroll
+             so the SDK isn't limited by the sample's UI when more
+             peers join than fit on screen. -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:fillViewport="true">
+            <LinearLayout
+                android:id="@+id/peerTilesRow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:minHeight="120dp"/>
+        </HorizontalScrollView>
+
+        <!-- Screen-share tile. Visible only when SOMEONE in the room
+             is sharing — bound dynamically to the first peer with a
+             non-null screenTrack, OR to our own local share preview. -->
+        <FrameLayout
+            android:id="@+id/screenShareTile"
+            android:layout_width="match_parent"
+            android:layout_height="240dp"
+            android:layout_marginTop="6dp"
+            android:background="#000000"
+            android:visibility="gone">
+            <org.webrtc.SurfaceViewRenderer
+                android:id="@+id/screenShareRenderer"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"/>
+            <TextView
+                android:id="@+id/screenShareLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|start"
+                android:layout_margin="6dp"
+                android:padding="4dp"
+                android:background="#88000000"
+                android:textColor="#ffffff"
+                android:textSize="11sp"
+                android:text="Screen share"/>
+        </FrameLayout>
+
+        <!-- Collaborative whiteboard tile. Three layers:
+               1. WebView background — renders the AI-generated SVG
+                  when generateWhiteboard() fires (own or remote).
+               2. WhiteboardCanvasView foreground — captures finger
+                  strokes, broadcasts each as a `whiteboard-annotate`
+                  pen-shape, and renders peers' incoming strokes.
+               3. A tiny toolbar (AI / Clear / Close) anchored to the
+                  bottom-right.
+             Tapping the Whiteboard button shows this tile *empty* —
+             AI generation is opt-in via the AI button (or via
+             "Hey Hebbs draw me a flowchart" from the assistant). -->
+        <FrameLayout
+            android:id="@+id/whiteboardTile"
+            android:layout_width="match_parent"
+            android:layout_height="320dp"
+            android:layout_marginTop="6dp"
+            android:background="#ffffff"
+            android:visibility="gone">
+            <WebView
+                android:id="@+id/whiteboardWebView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"/>
+            <io.twostars.sample.WhiteboardCanvasView
+                android:id="@+id/whiteboardCanvas"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@android:color/transparent"/>
+            <TextView
+                android:id="@+id/whiteboardLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|start"
+                android:layout_margin="6dp"
+                android:padding="4dp"
+                android:background="#88000000"
+                android:textColor="#ffffff"
+                android:textSize="11sp"
+                android:text="Whiteboard"/>
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|end"
+                android:layout_margin="6dp"
+                android:orientation="horizontal">
+                <Button
+                    android:id="@+id/whiteboardAiBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:padding="8dp"
+                    android:text="AI"
+                    android:textSize="11sp"/>
+                <Button
+                    android:id="@+id/whiteboardClearBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:layout_marginStart="4dp"
+                    android:padding="8dp"
+                    android:text="Clear"
+                    android:textSize="11sp"/>
+                <Button
+                    android:id="@+id/whiteboardCloseBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:layout_marginStart="4dp"
+                    android:padding="8dp"
+                    android:text="✕"
+                    android:textSize="11sp"/>
+            </LinearLayout>
+        </FrameLayout>
+
+        <!-- Media controls — three rows, hidden until publish() succeeds.
+             Row 1: publish + camera/mic toggles. Row 2: sharing + remote
+             control. Row 3: voice/AI features. The outer layout keeps
+             id=mediaControls so the activity's single visibility flip
+             still works. -->
+        <LinearLayout
+            android:id="@+id/mediaControls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="8dp"
+            android:visibility="gone">
+
+            <!-- Row 1 — publish + camera + mic -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <Button
+                    android:id="@+id/publishBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Publish"/>
+                <Button
+                    android:id="@+id/muteBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="Mute"
+                    android:enabled="false"/>
+                <Button
+                    android:id="@+id/videoBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="Video off"
+                    android:enabled="false"/>
+                <Button
+                    android:id="@+id/switchCamBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="Flip cam"
+                    android:enabled="false"/>
+                <Button
+                    android:id="@+id/fxBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="FX:off"
+                    android:enabled="false"/>
+            </LinearLayout>
+
+            <!-- Row 1.5 — A8.2 / A8.3 frame processors -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="6dp">
+                <Button
+                    android:id="@+id/bgBlurBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="BG blur:off"
+                    android:enabled="false"/>
+                <Button
+                    android:id="@+id/bgImageBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="BG image:off"
+                    android:enabled="false"/>
+                <Button
+                    android:id="@+id/autoFrameBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="Auto-frame:off"
+                    android:enabled="false"/>
+                <Button
+                    android:id="@+id/bgAiBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="BG AI:off"
+                    android:enabled="false"/>
+            </LinearLayout>
+
+            <!-- Row 2 — sharing + remote control -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="6dp">
+                <Button
+                    android:id="@+id/screenShareBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Share screen"
+                    android:enabled="false"/>
+                <Button
+                    android:id="@+id/whiteboardBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="Whiteboard"
+                    android:enabled="false"/>
+                <Button
+                    android:id="@+id/reqControlBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="Req ctrl"
+                    android:enabled="false"/>
+                <Button
+                    android:id="@+id/revokeControlBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="Revoke"
+                    android:enabled="false"/>
+            </LinearLayout>
+
+            <!-- Row 3 — voice/AI -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="6dp">
+                <Button
+                    android:id="@+id/transcribeBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1.2"
+                    android:text="Transcribe"
+                    android:enabled="false"/>
+                <Button
+                    android:id="@+id/translateBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="→ HE"
+                    android:enabled="false"/>
+                <Button
+                    android:id="@+id/sttLangBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="STT:auto"/>
+                <Button
+                    android:id="@+id/wakeWordBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="Wake"/>
+                <Button
+                    android:id="@+id/hebbsToggleBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="Hebbs"
+                    android:enabled="false"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Browser-invite buttons. Each mints a fresh participant token
+             for the current room and pops the share sheet so you can
+             send the URL anywhere (WhatsApp, Slack, email) and click on
+             a desktop browser to join from there. -->
+        <LinearLayout
+            android:id="@+id/inviteControls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="6dp"
+            android:visibility="gone">
+            <Button
+                android:id="@+id/inviteABtn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Invite browser A"/>
+            <Button
+                android:id="@+id/inviteBBtn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                android:text="Invite browser B"/>
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Peers in room"
+            android:textStyle="bold"/>
+        <TextView
+            android:id="@+id/peersList"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="60dp"
+            android:textIsSelectable="true"/>
+
+        <!-- Chat panel — bound to room.messages SharedFlow + sendMessage().
+             E2E status pill flips to green once isRoomKeyReady=true. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="16dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Chat"
+                android:textStyle="bold"/>
+            <TextView
+                android:id="@+id/e2eStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:padding="4dp"
+                android:background="#fee2e2"
+                android:textColor="#991b1b"
+                android:textSize="10sp"
+                android:text="E2E key: pending"/>
+        </LinearLayout>
+        <ScrollView
+            android:id="@+id/chatScroll"
+            android:layout_width="match_parent"
+            android:layout_height="160dp"
+            android:background="#f9f9f9"
+            android:padding="6dp"
+            android:layout_marginTop="4dp">
+            <TextView
+                android:id="@+id/chatLog"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textIsSelectable="true"/>
+        </ScrollView>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp">
+            <EditText
+                android:id="@+id/chatInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Type a message…"
+                android:singleLine="true"
+                android:enabled="false"/>
+            <Button
+                android:id="@+id/chatCorrectBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="Correct"
+                android:enabled="false"/>
+            <Button
+                android:id="@+id/askHebbsBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="Ask Hebbs"
+                android:enabled="false"/>
+            <Button
+                android:id="@+id/chatSendBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="Send"
+                android:enabled="false"/>
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Events"
+            android:textStyle="bold"/>
+        <ScrollView
+            android:id="@+id/eventsScroll"
+            android:layout_width="match_parent"
+            android:layout_height="180dp">
+            <TextView
+                android:id="@+id/eventsLog"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:textSize="12sp"
+                android:textIsSelectable="true"/>
+        </ScrollView>
+
+    </LinearLayout>
+</ScrollView>

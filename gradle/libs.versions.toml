@@ -1,10 +1,33 @@
 [versions]
 agp = "8.4.1"
-kotlin = "1.9.23"
-coroutines = "1.8.0"
-serialization = "1.6.3"
+# Kotlin pinned to match what crow-misia ships with libwebrtc-ktx 1.12.0
+# and libmediasoup-android 0.21.0. Mismatch here = "metadata version
+# 2.1.0 but compiler can read up to 2.0.0" build errors.
+kotlin = "2.1.21"
+coroutines = "1.10.2"
+serialization = "1.8.0"
 socketio = "2.1.0"
 okhttp = "4.12.0"
+# libmediasoup-android bundles its OWN org.webrtc.* classes (statically
+# linked against libwebrtc inside libmediasoupclient_so.so), so we
+# don't add a separate org.webrtc artifact — that would trip the
+# Android plugin's duplicate-class check at packageDebug time.
+#
+#   - io.github.crow-misia.libmediasoup-
+#       android:libmediasoup-android       — mediasoup client + native
+#                                            libmediasoupclient_so.so
+#                                            (also provides org.webrtc.*).
+#   - io.github.crow-misia.libwebrtc:
+#       libwebrtc-ktx                      — Kotlin extensions on top of
+#                                            org.webrtc that libmediasoup
+#                                            uses internally.
+#
+# At runtime, MediasoupClient.initialize(context) — called from
+# WebRTCFactory.build — takes care of loading the native lib + wiring
+# up the underlying PeerConnectionFactory. Don't call
+# PeerConnectionFactory.initialize() ourselves.
+libwebrtc-ktx = "1.12.0"
+mediasoup = "0.21.0"
 androidx-core = "1.13.1"
 androidx-lifecycle = "2.7.0"
 androidx-activity = "1.9.0"
@@ -12,8 +35,16 @@ androidx-appcompat = "1.6.1"
 material = "1.11.0"
 constraintlayout = "2.1.4"
 junit = "4.13.2"
+mockk = "1.13.10"
 androidx-test-junit = "1.1.5"
 androidx-test-espresso = "3.5.1"
+# A8.2 — MediaPipe Tasks Vision (SelfieSegmentation backbone for the
+# virtual-background processor). A8.3 — ML Kit Face Detection (used by
+# the auto-frame processor; chose ML Kit over MediaPipe FaceDetection
+# because Play Services already ships it on most devices, no model
+# bundle required).
+mediapipe-tasks-vision = "0.10.18"
+mlkit-face-detection = "16.1.7"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -21,13 +52,20 @@ kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutine
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 socketio-client = { module = "io.socket:socket.io-client", version.ref = "socketio" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+libwebrtc-ktx = { module = "io.github.crow-misia.libwebrtc:libwebrtc-ktx", version.ref = "libwebrtc-ktx" }
+libmediasoup-android = { module = "io.github.crow-misia.libmediasoup-android:libmediasoup-android", version.ref = "mediasoup" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
 androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "androidx-lifecycle" }
+androidx-lifecycle-process = { module = "androidx.lifecycle:lifecycle-process", version.ref = "androidx-lifecycle" }
 androidx-activity-ktx = { module = "androidx.activity:activity-ktx", version.ref = "androidx-activity" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidx-appcompat" }
 material = { module = "com.google.android.material:material", version.ref = "material" }
 androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
+mediapipe-tasks-vision = { module = "com.google.mediapipe:tasks-vision", version.ref = "mediapipe-tasks-vision" }
+mlkit-face-detection = { module = "com.google.mlkit:face-detection", version.ref = "mlkit-face-detection" }
 junit = { module = "junit:junit", version.ref = "junit" }
+mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 androidx-test-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-junit" }
 androidx-test-espresso = { module = "androidx.test.espresso:espresso-core", version.ref = "androidx-test-espresso" }
 
