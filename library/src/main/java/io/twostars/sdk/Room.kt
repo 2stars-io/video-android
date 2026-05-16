@@ -361,18 +361,11 @@ public class Room internal constructor(
             val peer = obj.toPeer() ?: return@onPeerJoined
             _peers.update { it + (peer.participantId to peer) }
             _events.tryEmit(RoomEvent.PeerJoined(peer))
-            // E4 — if E2E media encryption is enabled, derive the
-            // newcomer's per-sender SFrame key so their incoming
-            // consumers can decrypt. The derivation is deterministic
-            // from (roomKey, participantId) so both sides match.
-            if (sfu.mediaEncryptionEnabled) {
-                val rk = roomKey
-                if (rk != null) {
-                    runCatching {
-                        sfu.setRemoteSenderKey(peer.participantId, SFrame.deriveSenderKey(rk, peer.participantId))
-                    }
-                }
-            }
+            // E4 — E2E *media* encryption is planned for v0.6.0 on Android
+            // (needs the native FrameEncryptor JNI bridge). E2E messaging
+            // (Message.kt) is fully implemented and works today. Until the
+            // native bridge lands, sfu.mediaEncryptionEnabled is always
+            // false and there's no per-sender key derivation to do here.
             // E8 — re-announce our camera/mic state so the new peer
             // renders our tile correctly. Defaults are `true` on both
             // sides, so this only matters when we've previously
@@ -784,22 +777,24 @@ public class Room internal constructor(
      * Throws if the room key isn't ready yet.
      */
     public suspend fun setMediaEncryption(enabled: Boolean) {
-        if (!enabled) {
-            // Disable is best-effort — we can't unhook libwebrtc's
-            // frame encryptor on already-attached producers. New
-            // producers won't get one going forward.
-            sfu.mediaEncryptionEnabled = false
-            return
+        // E2E *media* encryption (SFrame) is planned for v0.6.0 on Android.
+        // The native libwebrtc FrameEncryptor interface is JNI-only —
+        // a pure-Kotlin implementation isn't reachable without an
+        // accompanying native bridge, which the SDK doesn't yet ship.
+        //
+        // The JS / Web SDK has the full implementation today; cross-
+        // platform interop for the media plane will land when this
+        // Android-side bridge is in.
+        //
+        // E2E *messaging* (Message.kt — AES-GCM payload encryption) works
+        // today and is independent of this.
+        if (enabled) {
+            throw UnsupportedOperationException(
+                "E2E media encryption is not yet supported on Android (planned for v0.6.0). " +
+                "End-to-end-encrypted MESSAGES still work via Message.kt."
+            )
         }
-        val rk = roomKey
-            ?: throw IllegalStateException("setMediaEncryption: room key not ready")
-        val ourKey = SFrame.deriveSenderKey(rk, self.participantId)
-        // Pre-derive keys for every peer we already know about so
-        // their consumers can decrypt on the next consumeProducer.
-        val remoteKeys = peers.value.values.associate { peer ->
-            peer.participantId to SFrame.deriveSenderKey(rk, peer.participantId)
-        }
-        sfu.enableMediaEncryption(ourKey, remoteKeys)
+        // Disable is a no-op — nothing to unhook because nothing was hooked.
     }
 
     /**
@@ -959,7 +954,7 @@ public class Room internal constructor(
      * via [StarsClient.configureWebRTC]. Useful for "battery may
      * drain faster — tap to switch to lower quality" UX hints.
      */
-    public val encoderInfo: io.twostars.sdk.internal.WebRTCFactory.EncoderInfo
+    public val encoderInfo: io.twostars.sdk.EncoderInfo
         get() = factory.encoderInfo
 
     // --- E7 Background-tab / lifecycle resilience -------------------------

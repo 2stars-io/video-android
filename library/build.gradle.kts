@@ -96,7 +96,7 @@ publishing {
             // the groupId + artifactId above are IGNORED — JitPack auto-derives
             // them from the GitHub repo path. The values stay here for direct
             // mavenLocal() consumers + future Maven Central publishing.
-            version = "0.5.0"
+            version = "0.5.1"
 
             afterEvaluate {
                 from(components["release"])

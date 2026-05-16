@@ -59,31 +59,11 @@ public class StarsClient(
     // leak; the WebRTC bits genuinely need an application-scoped one.
     private val appContext: Context = context.applicationContext
 
-    public companion object {
-        /**
-         * E8 — configure WebRTC encoder behaviour BEFORE any [connect]
-         * call. Defaults are sensible (hardware encoder preferred,
-         * H.264 high profile + Intel VP8 enabled) so most apps don't
-         * need to touch this. Calling AFTER the first connect is a
-         * no-op and logs a warning — PeerConnectionFactory is process-
-         * singleton + can't be reconfigured live.
-         *
-         * Use [forceSoftwareEncoder] for QA on devices with broken
-         * vendor codecs; the call is a one-liner alias for the common
-         * tweak.
-         */
-        @JvmStatic
-        public fun configureWebRTC(config: io.twostars.sdk.internal.WebRTCFactory.Config) {
-            io.twostars.sdk.internal.WebRTCFactory.configure(config)
-        }
-
-        /** Convenience: turn off the hardware encoder path entirely. */
-        @JvmStatic
-        public fun forceSoftwareEncoder() {
-            configureWebRTC(io.twostars.sdk.internal.WebRTCFactory.Config(
-                hardwareEncoderPreferred = false))
-        }
-    }
+    // Companion is declared once at the bottom of this class (line ~219)
+    // to host all the static-style helpers (configureWebRTC,
+    // forceSoftwareEncoder, sharedEglBaseContext). Kotlin only allows
+    // one companion per class — adding two here was a v0.5.0 regression
+    // that broke the JitPack build.
 
     /**
      * Open a Socket.IO connection to the 2Stars API and authenticate
@@ -217,6 +197,40 @@ public class StarsClient(
      * off cost); subsequent calls return the cached context.
      */
     public companion object {
+        /**
+         * E8 — configure WebRTC encoder behaviour BEFORE any [connect]
+         * call. Defaults are sensible (hardware encoder preferred,
+         * H.264 high profile + Intel VP8 enabled) so most apps don't
+         * need to touch this. Calling AFTER the first connect is a
+         * no-op and logs a warning — PeerConnectionFactory is process-
+         * singleton + can't be reconfigured live.
+         *
+         * Use [forceSoftwareEncoder] for QA on devices with broken
+         * vendor codecs; the call is a one-liner alias for the common
+         * tweak.
+         */
+        @JvmStatic
+        public fun configureWebRTC(config: io.twostars.sdk.WebRTCConfig) {
+            io.twostars.sdk.internal.WebRTCFactory.configure(config)
+        }
+
+        /** Convenience: turn off the hardware encoder path entirely. */
+        @JvmStatic
+        public fun forceSoftwareEncoder() {
+            configureWebRTC(io.twostars.sdk.WebRTCConfig(
+                hardwareEncoderPreferred = false))
+        }
+
+        /**
+         * Return the shared [EglBase.Context] used by the SDK's
+         * WebRTC plumbing. A consumer renderer (e.g. an external
+         * `SurfaceViewRenderer`) MUST initialise with this context
+         * so its GL pipeline shares textures with the SDK's
+         * capture/render path — otherwise frames render black.
+         *
+         * Idempotent — first call lazily builds the singleton (~100ms
+         * one-off cost); subsequent calls return the cached context.
+         */
         @JvmStatic
         public fun sharedEglBaseContext(context: Context): EglBase.Context =
             WebRTCFactory.obtain(context.applicationContext).eglBase.eglBaseContext

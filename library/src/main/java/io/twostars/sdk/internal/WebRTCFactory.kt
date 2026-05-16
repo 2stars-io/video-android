@@ -16,6 +16,12 @@ import org.webrtc.PeerConnectionFactory
 import org.webrtc.audio.AudioDeviceModule
 import org.webrtc.audio.JavaAudioDeviceModule
 
+// Lifted from a nested companion data class to a top-level public type so
+// the public API surface (StarsClient.configureWebRTC, Room.encoderInfo)
+// can reference it without the visibility cap of `internal` parents.
+import io.twostars.sdk.WebRTCConfig as Config
+import io.twostars.sdk.EncoderInfo
+
 /**
  * Process-singleton wrapper around the heavy WebRTC plumbing every
  * [io.twostars.sdk.Room] depends on:
@@ -92,22 +98,16 @@ internal class WebRTCFactory private constructor(
          *   support it. Lower bitrate at the same visual quality;
          *   slightly higher CPU on encode. Default true.
          */
-        data class Config(
-            val hardwareEncoderPreferred: Boolean = true,
-            val enableIntelVp8Encoder: Boolean = true,
-            val enableH264HighProfile: Boolean = true,
-        )
-
-        /**
-         * E8 — diagnostic snapshot of which encoder backend is in use
-         * + which codecs the selected backend supports. Read via
-         * [WebRTCFactory.encoderInfo].
-         */
-        data class EncoderInfo(
-            val backend: String,                 // "hardware" | "software"
-            val hardwareEncoderPreferred: Boolean,
-            val supportedCodecs: List<String>,    // codec names, e.g. ["H264", "VP8", "VP9"]
-        )
+        // Config + EncoderInfo are now top-level public data classes in
+        // package io.twostars.sdk — see WebRTCConfig.kt. They were lifted
+        // out of this companion because an `internal class`'s public
+        // members are visibility-capped to internal, which made
+        // StarsClient.configureWebRTC / Room.encoderInfo unreachable.
+        //
+        // The names "Config" and "EncoderInfo" still resolve here via
+        // the `import ... as Config` alias at the top of this file, so
+        // the call sites below (line 56, 66, 232, etc.) compile without
+        // rewriting.
 
         /**
          * The currently-installed mic sink, fed by the ADM's

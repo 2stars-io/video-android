@@ -264,16 +264,11 @@ internal class SfuPipe(
                 appData = appData,
             )
         }
-        // E4 — wire SFrame encryption if enabled. ourSenderKey is set
-        // by Room.setMediaEncryption() before any produce calls go out.
-        // Uses libwebrtc's FrameEncryptor hook on the underlying RTC
-        // sender — payloads are opaque to the SFU from this point.
-        ourSenderKey?.let { k ->
-            if (mediaEncryptionEnabled) {
-                runCatching { producer.setFrameEncryptor(SFrameEncryptor(k)) }
-                    .onFailure { Log.w(TAG, "produceTrack: setFrameEncryptor failed", it) }
-            }
-        }
+        // E4 — SFrame-based E2E media encryption is planned for v0.6.0
+        // (needs the native libwebrtc FrameEncryptor JNI bridge). Until
+        // then, mediaEncryptionEnabled is always false and we skip the
+        // wiring entirely. See Room.setMediaEncryption for the user-facing
+        // explanation.
         producers[key] = producer
     }
 
@@ -359,19 +354,10 @@ internal class SfuPipe(
             )
         } ?: return@withLock
 
-        // E4 — derive (or reuse) the producer's per-sender key and
-        // attach a FrameDecryptor. The producer's participantId is
-        // carried in the new-producer info; both sides derive the
-        // same key from (roomKey, participantId) via HKDF.
-        if (mediaEncryptionEnabled) {
-            val devKey = remoteSenderKeys[info.participantId]
-            if (devKey != null) {
-                runCatching { consumer.setFrameDecryptor(SFrameDecryptor(devKey)) }
-                    .onFailure { Log.w(TAG, "consumeProducer: setFrameDecryptor failed", it) }
-            } else {
-                Log.w(TAG, "consumeProducer: no sender key cached for ${info.participantId} — frames will fail decrypt")
-            }
-        }
+        // E4 — SFrame-based E2E media encryption is planned for v0.6.0
+        // on Android. Until the native FrameEncryptor/FrameDecryptor
+        // JNI bridge lands, mediaEncryptionEnabled is always false and
+        // we skip the per-consumer key derivation entirely.
 
         val mediaType = info.mediaType ?: ack.mediaType ?: "camera"
         val track = consumer.track
