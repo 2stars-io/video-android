@@ -26,7 +26,7 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.2stars-io:video-android:0.5.0")
+    implementation("com.github.2stars-io:video-android:0.5.1")
 }
 ```
 
@@ -86,7 +86,7 @@ Requires JDK 17 (set `JAVA_HOME` to a JBR 17 or any OpenJDK 17 — AGP 8.2 is in
 
 ## Versioning
 
-Current: **0.5.0** — A2 + A4 + A5 + A6 capabilities shipped (media plane, E2E messaging, screen share, AI in-call). A7 / Whiteboard / Avatar are not yet implemented on Android.
+Current: **0.5.1** — A2 + A4 + A5 + A6 capabilities shipped (media plane, E2E messaging, screen share, AI in-call). A7 / Whiteboard / Avatar are not yet implemented on Android. **E2E media-frame encryption (SFrame) is deferred to v0.6.0** — needs a native JNI bridge; the JS and Web SDKs have the full implementation today.
 
 ## License
 
