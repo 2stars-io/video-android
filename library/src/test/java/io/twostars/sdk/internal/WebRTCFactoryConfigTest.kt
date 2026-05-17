@@ -1,5 +1,7 @@
 package io.twostars.sdk.internal
 
+import io.twostars.sdk.EncoderInfo
+import io.twostars.sdk.WebRTCConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -7,7 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * E8 — unit tests for [WebRTCFactory.Config] + [WebRTCFactory.EncoderInfo].
+ * E8 — unit tests for [WebRTCConfig] + [EncoderInfo].
  *
  * The actual encoder factory selection runs in libwebrtc's native code +
  * needs an EglBase + a real PeerConnectionFactory init, which can only
@@ -21,14 +23,14 @@ import org.junit.Test
 class WebRTCFactoryConfigTest {
 
     @Test fun `default config prefers hardware encoder`() {
-        val c = WebRTCFactory.Config()
+        val c = WebRTCConfig()
         assertTrue("hardware should be preferred by default", c.hardwareEncoderPreferred)
         assertTrue("Intel VP8 enabled by default", c.enableIntelVp8Encoder)
         assertTrue("H264 high profile enabled by default", c.enableH264HighProfile)
     }
 
     @Test fun `copy preserves untouched fields`() {
-        val base = WebRTCFactory.Config()
+        val base = WebRTCConfig()
         val tweaked = base.copy(hardwareEncoderPreferred = false)
         assertFalse(tweaked.hardwareEncoderPreferred)
         assertEquals(base.enableIntelVp8Encoder, tweaked.enableIntelVp8Encoder)
@@ -36,7 +38,7 @@ class WebRTCFactoryConfigTest {
     }
 
     @Test fun `EncoderInfo shape carries backend + supported codecs`() {
-        val info = WebRTCFactory.EncoderInfo(
+        val info = EncoderInfo(
             backend = "hardware",
             hardwareEncoderPreferred = true,
             supportedCodecs = listOf("H264", "VP8", "VP9"),
@@ -48,16 +50,16 @@ class WebRTCFactoryConfigTest {
     }
 
     @Test fun `equality on Config ignores construction order`() {
-        val a = WebRTCFactory.Config(hardwareEncoderPreferred = true,
+        val a = WebRTCConfig(hardwareEncoderPreferred = true,
             enableIntelVp8Encoder = false, enableH264HighProfile = true)
-        val b = WebRTCFactory.Config(enableH264HighProfile = true,
+        val b = WebRTCConfig(enableH264HighProfile = true,
             enableIntelVp8Encoder = false, hardwareEncoderPreferred = true)
         assertEquals(a, b)
     }
 
     @Test fun `data class differentiates configs`() {
-        val a = WebRTCFactory.Config(hardwareEncoderPreferred = true)
-        val b = WebRTCFactory.Config(hardwareEncoderPreferred = false)
+        val a = WebRTCConfig(hardwareEncoderPreferred = true)
+        val b = WebRTCConfig(hardwareEncoderPreferred = false)
         assertNotEquals(a, b)
     }
 }
