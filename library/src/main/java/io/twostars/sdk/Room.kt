@@ -10,6 +10,7 @@ import io.twostars.sdk.internal.Crypto
 import io.twostars.sdk.internal.IceServerSpec
 import io.twostars.sdk.internal.LocalCamera
 import io.twostars.sdk.internal.PeerConnectionPool
+import io.twostars.sdk.internal.PendingTrackQueue
 import io.twostars.sdk.internal.ScreenCapture
 import io.twostars.sdk.internal.SfuPipe
 import io.twostars.sdk.internal.SignalingCodec
@@ -87,16 +88,19 @@ public class Room internal constructor(
     // peer-joined hasn't landed yet. socket.io's per-receiver fanout
     // does not guarantee that `peer-joined` lands before `new-producer`
     // for the same participantId, and WebRTC's `onTrack` only fires
-    // once per remote track — so dropping the ref here used to leave
-    // the racing peer's tile permanently empty until they republished.
-    // Drained by [drainPendingTracksFor] from the peer-joined handler.
-    // Capped per-peer via [MAX_PENDING_TRACKS_PER_PEER].
-    private val pendingTracks: MutableMap<String, MutableList<PendingTrack>> = HashMap()
-    private val pendingTracksLock = Any()
-
-    private data class PendingTrack(
-        val kind: TrackKind,
-        val track: MediaStreamTrack,
+    // once per remote track — dropping the ref here used to leave the
+    // racing peer's tile permanently empty until they republished.
+    // Drained from the peer-joined handler via [drainPendingTracksFor].
+    // See [PendingTrackQueue] for the full contract (FIFO, per-peer
+    // isolation, capped, thread-safe).
+    private val pendingTrackQueue = PendingTrackQueue(
+        onOverflow = { participantId, kind ->
+            android.util.Log.w(
+                "TwoStarsSDK",
+                "onRemoteTrack: queue full for unknown peer; dropping " +
+                    "(remoteId=$participantId, kind=$kind)",
+            )
+        },
     )
 
     private val _mode = MutableStateFlow(Mode.P2P)
@@ -401,7 +405,7 @@ public class Room internal constructor(
             _peers.value[pid]?.clearTracks()
             _peers.update { it - pid }
             // Drop any tracks we were holding for this peer — never bound now.
-            synchronized(pendingTracksLock) { pendingTracks.remove(pid) }
+            pendingTrackQueue.forget(pid)
             _events.tryEmit(RoomEvent.PeerLeft(pid))
         }
         // E8 — server told us a peer's camera/mic state. Update the
@@ -2280,7 +2284,7 @@ public class Room internal constructor(
             pool.closeAll()
             sfu.release()
             transport.close()
-            synchronized(pendingTracksLock) { pendingTracks.clear() }
+            pendingTrackQueue.clear()
             job.cancel()
         }
     }
@@ -2344,19 +2348,10 @@ public class Room internal constructor(
             // per-receiver fanout does not guarantee that `peer-joined` lands
             // before `new-producer` for the same participantId, and WebRTC's
             // `onTrack` only fires once per remote track. Queue and let the
-            // peer-joined handler bind via [drainPendingTracksFor].
-            synchronized(pendingTracksLock) {
-                val list = pendingTracks.getOrPut(remoteId) { mutableListOf() }
-                if (list.size >= MAX_PENDING_TRACKS_PER_PEER) {
-                    android.util.Log.w(
-                        "TwoStarsSDK",
-                        "onRemoteTrack: queue full for unknown peer; dropping " +
-                            "(remoteId=$remoteId, kind=$kind, queued=${list.size})",
-                    )
-                    return
-                }
-                list.add(PendingTrack(kind, track))
-            }
+            // peer-joined handler bind via [drainPendingTracksFor]. The
+            // queue rejects + logs overflow on its own; we don't need to
+            // distinguish accept/drop here.
+            pendingTrackQueue.enqueue(remoteId, kind, track)
             return
         }
         bindRemoteTrack(peer, kind, track)
@@ -2378,9 +2373,7 @@ public class Room internal constructor(
      * (FIFO). Idempotent — a no-op when nothing is queued.
      */
     private fun drainPendingTracksFor(participantId: String) {
-        val drained: List<PendingTrack> = synchronized(pendingTracksLock) {
-            pendingTracks.remove(participantId).orEmpty()
-        }
+        val drained = pendingTrackQueue.drain(participantId)
         if (drained.isEmpty()) return
         val peer = _peers.value[participantId] ?: return
         for (pt in drained) bindRemoteTrack(peer, pt.kind, pt.track)
@@ -2403,11 +2396,6 @@ public class Room internal constructor(
         // client-side timeout. Most signaling events finish in
         // hundreds of ms — they don't need this.
         private const val AI_ACK_TIMEOUT_MS = 30_000L
-
-        // Soft cap on how many track refs to queue for a single
-        // not-yet-known participantId. Each peer queues at most 3
-        // (audio, camera-video, screen-video) under normal traffic.
-        private const val MAX_PENDING_TRACKS_PER_PEER = 10
     }
 }
 
