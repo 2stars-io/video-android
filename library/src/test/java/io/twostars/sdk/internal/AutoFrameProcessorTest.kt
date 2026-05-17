@@ -40,16 +40,36 @@ class AutoFrameProcessorTest {
         // pickTarget is `internal` to the AutoFrameProcessor.Companion;
         // call it via Kotlin reflection so this test stays out of the
         // production class's `internal` package.
-        val cls = Class.forName("io.twostars.sdk.AutoFrameProcessor\$Companion")
+        val outerCls = Class.forName("io.twostars.sdk.AutoFrameProcessor")
+        val companionCls = Class.forName("io.twostars.sdk.AutoFrameProcessor\$Companion")
         val hysteresisCls = Class.forName("io.twostars.sdk.AutoFrameProcessor\$HysteresisState")
         val hysteresis = hysteresisCls.getDeclaredConstructor(
             java.lang.Float.TYPE, java.lang.Integer.TYPE,
             java.lang.Float.TYPE, java.lang.Integer.TYPE,
         ).newInstance(lastArea, pendingFrames, requiredRatio, requiredFrames)
-        val method = cls.declaredMethods.first { it.name == "pickTarget\$library" || it.name == "pickTarget" }
+        // Locate `pickTarget`. Kotlin name-mangles `internal` functions
+        // with the module name. AGP 8.x + Kotlin 2.x emit per-variant
+        // mangling for Android library modules — `pickTarget\$library_debug`
+        // under the unit-test variant, `pickTarget\$library_release` under
+        // release, plain `pickTarget` if the function is later made
+        // non-internal. Match by prefix so the test survives any of those.
+        // Search Companion first (instance method via `@JvmStatic` keeps a
+        // copy there), then fall back to the outer class (static accessor
+        // for `@JvmStatic`).
+        val (method, receiver) =
+            companionCls.declaredMethods.firstOrNull { it.name.startsWith("pickTarget") }
+                ?.let { it to (AutoFrameProcessor.Companion as Any?) }
+            ?: outerCls.declaredMethods.firstOrNull { it.name.startsWith("pickTarget") }
+                ?.let { it to (null as Any?) }
+            ?: error(
+                "pickTarget reflection lookup failed. " +
+                    "Companion methods: " +
+                    companionCls.declaredMethods.joinToString { it.name } +
+                    " ; outer methods: " +
+                    outerCls.declaredMethods.joinToString { it.name },
+            )
         method.isAccessible = true
-        val instance = AutoFrameProcessor.Companion
-        val r = method.invoke(instance, boxes, current, lastFaceWallMs, nowWallMs,
+        val r = method.invoke(receiver, boxes, current, lastFaceWallMs, nowWallMs,
             holdMs, targetFaceFraction, hysteresis)
         val win = r!!.javaClass.getMethod("getWindow").invoke(r) as CropWindow
         val la = r.javaClass.getMethod("getLastArea").invoke(r) as Float
@@ -231,8 +251,13 @@ class AutoFrameProcessorTest {
             targetFaceFraction = 0.60f,
             lastArea = 0f, pendingFrames = 0,
         )
-        // scale = 0.10 / 0.60 ≈ 0.167
-        assertEquals(0.167f, winSmall.scale, 1e-3f)
+        // Raw math: 0.10 / 0.60 ≈ 0.167. Production code clamps the
+        // computed scale to coerceIn(0.2f, 1.0f) so we never go below
+        // a 20% crop — anything tighter than that frames a near face-
+        // only window that jitters badly on small head movements.
+        // The clamp is intentional; this assertion locks it in so the
+        // next refactor that loosens the floor surfaces here.
+        assertEquals(0.2f, winSmall.scale, 1e-5f)
         assertTrue("tighter crop", winSmall.scale < 0.5f)
     }
 }
