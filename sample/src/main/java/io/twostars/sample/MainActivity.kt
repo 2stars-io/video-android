@@ -664,6 +664,31 @@ class MainActivity : AppCompatActivity() {
                         toast("screen share ended (${ev.reason})")
                     }
                 }
+                is RoomEvent.ConnectionStateChanged -> log("connection-state -> ${ev.state}")
+                is RoomEvent.LocalTrackEnded     -> log("local track ${ev.kind} ended: ${ev.reason}")
+                is RoomEvent.LocalTrackRecovered -> log("local track ${ev.kind} recovered")
+                is RoomEvent.LocalTrackFailed    -> {
+                    log("local track ${ev.kind} failed: ${ev.reason}")
+                    toast("camera unavailable - tap retry")
+                }
+                is RoomEvent.BackgroundReady     -> log("background ready (${ev.mode})")
+                is RoomEvent.BackgroundError     -> log("background error: ${ev.reason}")
+                is RoomEvent.BackgroundCleared   -> log("background cleared")
+                is RoomEvent.AutoFrameEnabled    -> log("auto-frame on")
+                is RoomEvent.AutoFrameDisabled   -> log("auto-frame off")
+                is RoomEvent.ScreenShareStarted  -> log("screen share started (${ev.streamId})")
+                // Existing pre-parity events the sample doesn't render
+                // anywhere (moderation, lifecycle, etc.) — keep them as
+                // silent no-ops so the when stays exhaustive when the
+                // sealed class grows again.
+                is RoomEvent.PeerStateChanged,
+                is RoomEvent.E2eRecordingMode,
+                is RoomEvent.Kicked,
+                is RoomEvent.ForceMuted,
+                is RoomEvent.Banned,
+                is RoomEvent.RoomLocked,
+                is RoomEvent.ModerationEvent,
+                is RoomEvent.VisibilityChanged -> Unit
             }
         }
     }
@@ -1099,7 +1124,7 @@ class MainActivity : AppCompatActivity() {
         // server's Gemini call runs (typically 5–15 s).
         b.bgAiBtn.text = "BG AI:…"
         b.bgAiBtn.isEnabled = false
-        scope.launch {
+        lifecycleScope.launch {
             try {
                 r.setBackground("calm forest at dawn, soft golden light")
                 bgAiOn = true
