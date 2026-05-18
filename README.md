@@ -26,7 +26,7 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.2stars-io:video-android:0.5.2")
+    implementation("com.github.2stars-io:video-android:0.5.3")
 }
 ```
 
