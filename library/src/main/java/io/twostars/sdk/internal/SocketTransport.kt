@@ -53,6 +53,13 @@ internal class SocketTransport(
     private var onAuthenticated: ((SelfPresence, List<IceServerSpec>) -> Unit)? = null
     private var onAuthError:    ((String) -> Unit)? = null
     private var onConnectError: ((String) -> Unit)? = null
+    private var onReconnected:  (() -> Unit)? = null
+    // True after the FIRST `authenticated` event. Subsequent `authenticated`
+    // events (after the socket.io client reconnects) fire onReconnected
+    // instead of onAuthenticated so Room.kt can flip
+    // ConnectionState RECONNECTING -> CONNECTED without trying to rebuild
+    // its state from a SelfPresence it already has.
+    @Volatile private var everAuthenticated = false
     private var onPeerJoined:    ((JsonObject) -> Unit)? = null
     private var onPeerLeft:      ((JsonObject) -> Unit)? = null
     private var onParticipantStateChanged: ((JsonObject) -> Unit)? = null
@@ -99,6 +106,7 @@ internal class SocketTransport(
     fun onAuthenticated(cb: (SelfPresence, List<IceServerSpec>) -> Unit) { onAuthenticated = cb }
     fun onAuthError(cb: (String) -> Unit) { onAuthError = cb }
     fun onConnectError(cb: (String) -> Unit) { onConnectError = cb }
+    fun onReconnected(cb: () -> Unit) { onReconnected = cb }
     fun onPeerJoined(cb: (JsonObject) -> Unit) { onPeerJoined = cb }
     fun onPeerLeft(cb: (JsonObject) -> Unit) { onPeerLeft = cb }
     fun onParticipantStateChanged(cb: (JsonObject) -> Unit) { onParticipantStateChanged = cb }
@@ -186,7 +194,15 @@ internal class SocketTransport(
                 onAuthError?.invoke("malformed participant token")
                 return@on
             }
-            onAuthenticated?.invoke(presence, ice)
+            if (!everAuthenticated) {
+                everAuthenticated = true
+                onAuthenticated?.invoke(presence, ice)
+            } else {
+                // socket.io reconnected and the server re-authenticated us.
+                // Room.kt only wants to know about the transition; the
+                // SelfPresence + ICE list it already has are still valid.
+                onReconnected?.invoke()
+            }
         }
 
         s.on("peer-joined") { args ->

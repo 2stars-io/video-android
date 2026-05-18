@@ -93,4 +93,13 @@ public class LocalMedia internal constructor(
     internal fun stop() {
         camera.stop()
     }
+
+    /**
+     * Internal bridge so [io.twostars.sdk.Room.retryLocalTrack] can ask
+     * the underlying capturer to recover without leaking the LocalCamera
+     * reference into the public API surface. Returns true if
+     * startCapture succeeded; the actual frame-flowing recovery is
+     * confirmed by the camera-events handler downstream.
+     */
+    internal fun retryVideoCapture(): Boolean = camera.retryVideoCapture()
 }

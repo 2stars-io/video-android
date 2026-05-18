@@ -111,6 +111,27 @@ public class Room internal constructor(
     /** Lifecycle event stream — finer-grained than [peers] / [mode]. */
     public val events: SharedFlow<RoomEvent> = _events.asSharedFlow()
 
+    // Coarse transport state. CONNECTED at construction time (we only
+    // ever reach Room.<init> after StarsClient.connect succeeded - the
+    // `authenticated` event is what produced the SelfPresence we hold).
+    // Transitions to RECONNECTING on disconnect, back to CONNECTED on the
+    // next `authenticated`, DISCONNECTED on leave() / fatal error.
+    // Mirrors the JS SDK's `room.connectionState` (parity v0.4.4).
+    private val _connectionState = MutableStateFlow(ConnectionState.CONNECTED)
+    /**
+     * Reactive view of the transport state. Apps that just want the
+     * `state` value should read this; apps that want to react to each
+     * *transition* should observe [events] for [RoomEvent.ConnectionStateChanged].
+     */
+    public val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
+
+    private fun setConnectionState(next: ConnectionState) {
+        val prev = _connectionState.value
+        if (prev == next) return
+        _connectionState.value = next
+        _events.tryEmit(RoomEvent.ConnectionStateChanged(next))
+    }
+
     private val _localMedia = MutableStateFlow<LocalMedia?>(null)
     /** Currently-published local camera + mic, or `null` when not publishing. */
     public val localMedia: StateFlow<LocalMedia?> = _localMedia.asStateFlow()
@@ -432,6 +453,18 @@ public class Room internal constructor(
         }
         transport.onDisconnected { reason ->
             _events.tryEmit(RoomEvent.Disconnected(reason))
+            // Socket.IO auto-retries (5 attempts) - flag the transition
+            // as RECONNECTING. If retries succeed, onReconnected below
+            // flips us back to CONNECTED; if they don't, the app should
+            // treat RECONNECTING-stuck-for-a-while as effectively
+            // DISCONNECTED. We leave that policy to the app.
+            setConnectionState(ConnectionState.RECONNECTING)
+        }
+        // Mirror the JS SDK's reconnect-then-re-authenticated path. The
+        // server emits `authenticated` again after a successful
+        // socket.io reconnect; treat that as RECONNECTING -> CONNECTED.
+        transport.onReconnected {
+            setConnectionState(ConnectionState.CONNECTED)
         }
 
         // P2P signaling. Each handler is wrapped because a thrown
@@ -1106,18 +1139,31 @@ public class Room internal constructor(
         mode: BackgroundProcessor.BackgroundMode,
         bitmap: android.graphics.Bitmap? = null,
     ) {
-        val media = _localMedia.value ?: return
+        val media = _localMedia.value ?: run {
+            _events.tryEmit(RoomEvent.BackgroundError("setVirtualBackground: call publish() first"))
+            return
+        }
         val ctx = context.applicationContext
         if (mode == BackgroundProcessor.BackgroundMode.OFF) {
             clearVirtualBackground()
             return
         }
-        val proc = _backgroundProcessor ?: BackgroundProcessor(ctx).also {
-            _backgroundProcessor = it
-            media.setVideoProcessor(it)
+        try {
+            val proc = _backgroundProcessor ?: BackgroundProcessor(ctx).also {
+                _backgroundProcessor = it
+                media.setVideoProcessor(it)
+            }
+            proc.setReplacementBitmap(bitmap)
+            proc.setMode(mode)
+            _events.tryEmit(RoomEvent.BackgroundReady(
+                mode = mode.name.lowercase(),
+                imageUrl = null,
+                prompt = null,
+            ))
+        } catch (t: Throwable) {
+            _events.tryEmit(RoomEvent.BackgroundError(t.message ?: t.javaClass.simpleName))
+            throw t
         }
-        proc.setReplacementBitmap(bitmap)
-        proc.setMode(mode)
     }
 
     /**
@@ -1139,26 +1185,36 @@ public class Room internal constructor(
      */
     public suspend fun setBackground(prompt: String): Unit =
         kotlinx.coroutines.withTimeout(AI_ACK_TIMEOUT_MS) {
-            val media = _localMedia.value
-                ?: throw IllegalStateException("setBackground: call publish() first")
-            val ack = transport.emitWithAckSuspending("generate-background", buildJsonObject {
-                put("prompt", JsonPrimitive(prompt))
-            }) ?: throw IllegalStateException("generate-background: no ack")
-            if (ack["ok"]?.jsonPrimitive?.boolean != true) {
-                val err = ack["error"]?.jsonPrimitive?.contentOrNull ?: "generate-background failed"
-                throw IllegalStateException(err)
+            try {
+                val media = _localMedia.value
+                    ?: throw IllegalStateException("setBackground: call publish() first")
+                val ack = transport.emitWithAckSuspending("generate-background", buildJsonObject {
+                    put("prompt", JsonPrimitive(prompt))
+                }) ?: throw IllegalStateException("generate-background: no ack")
+                if (ack["ok"]?.jsonPrimitive?.boolean != true) {
+                    val err = ack["error"]?.jsonPrimitive?.contentOrNull ?: "generate-background failed"
+                    throw IllegalStateException(err)
+                }
+                val imageUrl = ack["imageUrl"]?.jsonPrimitive?.contentOrNull
+                    ?: throw IllegalStateException("generate-background: missing imageUrl")
+                val bitmap = decodeDataUrlToBitmap(imageUrl)
+                    ?: throw IllegalStateException("generate-background: could not decode image")
+                val ctx = context.applicationContext
+                val proc = _backgroundProcessor ?: BackgroundProcessor(ctx).also {
+                    _backgroundProcessor = it
+                    media.setVideoProcessor(it)
+                }
+                proc.setReplacementBitmap(bitmap)
+                proc.setMode(BackgroundProcessor.BackgroundMode.IMAGE)
+                _events.tryEmit(RoomEvent.BackgroundReady(
+                    mode = "image",
+                    imageUrl = imageUrl,
+                    prompt = prompt,
+                ))
+            } catch (t: Throwable) {
+                _events.tryEmit(RoomEvent.BackgroundError(t.message ?: t.javaClass.simpleName))
+                throw t
             }
-            val imageUrl = ack["imageUrl"]?.jsonPrimitive?.contentOrNull
-                ?: throw IllegalStateException("generate-background: missing imageUrl")
-            val bitmap = decodeDataUrlToBitmap(imageUrl)
-                ?: throw IllegalStateException("generate-background: could not decode image")
-            val ctx = context.applicationContext
-            val proc = _backgroundProcessor ?: BackgroundProcessor(ctx).also {
-                _backgroundProcessor = it
-                media.setVideoProcessor(it)
-            }
-            proc.setReplacementBitmap(bitmap)
-            proc.setMode(BackgroundProcessor.BackgroundMode.IMAGE)
         }
 
     /**
@@ -1180,12 +1236,14 @@ public class Room internal constructor(
 
     /** Remove the virtual background and revert to the raw camera frame. */
     public fun clearVirtualBackground() {
+        val hadProcessor = _backgroundProcessor != null
         val proc = _backgroundProcessor
         _backgroundProcessor = null
         proc?.setMode(BackgroundProcessor.BackgroundMode.OFF)
         // If auto-frame is also active, keep it attached; otherwise
         // detach from the camera entirely.
         if (_autoFrameProcessor == null) _localMedia.value?.setVideoProcessor(null)
+        if (hadProcessor) _events.tryEmit(RoomEvent.BackgroundCleared)
     }
 
     /**
@@ -1222,17 +1280,21 @@ public class Room internal constructor(
         val media = _localMedia.value ?: return
         val ctx = context.applicationContext
         if (!on) {
+            val wasOn = _autoFrameProcessor != null
             val proc = _autoFrameProcessor
             _autoFrameProcessor = null
             proc?.setEnabled(false)
             if (_backgroundProcessor == null) media.setVideoProcessor(null)
+            if (wasOn) _events.tryEmit(RoomEvent.AutoFrameDisabled)
             return
         }
+        val wasOff = _autoFrameProcessor == null
         val proc = _autoFrameProcessor ?: AutoFrameProcessor(ctx).also {
             _autoFrameProcessor = it
             media.setVideoProcessor(it)
         }
         proc.setEnabled(true)
+        if (wasOff) _events.tryEmit(RoomEvent.AutoFrameEnabled)
     }
 
     // E4.1 — close existing camera-audio/video producers and republish
@@ -1310,6 +1372,13 @@ public class Room internal constructor(
         }
         val session = ScreenShareSession(capture, streamId = "screen-${java.util.UUID.randomUUID()}")
         _screenShare.value = session
+        // Fire ScreenShareStarted BEFORE the publish hop so consumer
+        // UIs can render the "you're sharing" banner without waiting
+        // for the SFU produce ack (~50-200 ms). The pairing
+        // ScreenShareEnded always fires in stopScreenShare regardless
+        // of whether the publish succeeded, so observers always see a
+        // matched start/end pair.
+        _events.tryEmit(RoomEvent.ScreenShareStarted(session.streamId))
 
         if (sfu.isInSfuMode()) {
             sfu.produceTrack(capture.track, mediaType = "screen")
@@ -2221,12 +2290,124 @@ public class Room internal constructor(
      * Throws [IllegalStateException] if already publishing — call
      * [unpublish] first if you want to change constraints.
      */
+    // --- Local-track recovery (parity with JS SDK v0.4.4) ----------------
+
+    /**
+     * Max times the SDK will retry a wedged camera capture before
+     * giving up and emitting [RoomEvent.LocalTrackFailed]. Each retry
+     * uses exponential backoff (800ms, 2.5s, 7s - matching the JS SDK's
+     * `_recoverConsumer` schedule).
+     */
+    public val maxLocalTrackRetries: Int = 3
+
+    private val videoRetryAttempts = java.util.concurrent.atomic.AtomicInteger(0)
+    @Volatile private var videoTrackFailed: Boolean = false
+
+    /**
+     * Auto-retry a wedged camera capture with exponential backoff.
+     * Called from the camera-events listener installed in [publish].
+     * Bails out (no-op) once we've already emitted LocalTrackFailed -
+     * the next attempt comes from the app via [retryLocalTrack].
+     */
+    private suspend fun autoRetryVideoCapture(reason: String?) {
+        if (videoTrackFailed) return
+        val attempt = videoRetryAttempts.incrementAndGet()
+        if (attempt > maxLocalTrackRetries) {
+            videoTrackFailed = true
+            _events.tryEmit(RoomEvent.LocalTrackFailed(TrackKind.VIDEO, reason))
+            return
+        }
+        val delayMs = when (attempt) {
+            1 -> 800L
+            2 -> 2_500L
+            else -> 7_000L
+        }
+        kotlinx.coroutines.delay(delayMs)
+        val media = _localMedia.value ?: return  // unpublished mid-retry
+        // Trigger the retry via LocalCamera. We don't expose the
+        // LocalCamera reference past LocalMedia, so use a small bridge
+        // here.
+        val recovered = retryUnderlyingCapture(media, TrackKind.VIDEO)
+        if (!recovered) {
+            // Re-enter the autoRetry path on the same scope. The
+            // CameraEventsHandler.onCameraError won't fire from a failed
+            // restartCapture (libwebrtc swallows it inside
+            // CameraVideoCapturer.startCapture's executor), so drive the
+            // next attempt manually.
+            scope.launch { autoRetryVideoCapture(reason) }
+        }
+        // Success -> onFirstFrameAvailable will emit LocalTrackRecovered.
+    }
+
+    /**
+     * Manually retry recovering a wedged local track. Apps wire this to
+     * a "Try again" button surfaced after a [RoomEvent.LocalTrackFailed]
+     * (or pre-emptively after [RoomEvent.LocalTrackEnded] if they want
+     * to skip the SDK's automatic backoff).
+     *
+     * Resets the internal retry counter so the auto-retry budget starts
+     * fresh. Returns immediately; observe [events] for the outcome
+     * ([RoomEvent.LocalTrackRecovered] on success, another
+     * [RoomEvent.LocalTrackFailed] on failure).
+     *
+     * Mirrors the JS SDK's `room.retryLocalTrack(kind)`.
+     */
+    public fun retryLocalTrack(kind: TrackKind) {
+        if (kind != TrackKind.VIDEO) {
+            // Audio recovery on Android goes through the ADM and isn't
+            // surfaced as a track-ended event today (the AudioRecord
+            // sink keeps producing silence rather than ending). For
+            // parity with the JS API surface we accept the call but
+            // log + drop.
+            android.util.Log.i("TwoStarsSDK", "retryLocalTrack($kind) - no-op (only VIDEO is recoverable)")
+            return
+        }
+        val media = _localMedia.value ?: return
+        videoRetryAttempts.set(0)
+        videoTrackFailed = false
+        scope.launch {
+            val ok = retryUnderlyingCapture(media, kind)
+            if (!ok) {
+                videoTrackFailed = true
+                _events.tryEmit(RoomEvent.LocalTrackFailed(kind, "manual retry failed"))
+            }
+            // Success -> onFirstFrameAvailable will emit LocalTrackRecovered.
+        }
+    }
+
+    /**
+     * Bridge into the LocalCamera retry path. Kept private because we
+     * intentionally don't expose the LocalCamera reference past the
+     * LocalMedia wrapper.
+     */
+    private fun retryUnderlyingCapture(media: LocalMedia, kind: TrackKind): Boolean {
+        if (kind != TrackKind.VIDEO) return false
+        return media.retryVideoCapture()
+    }
+
     public suspend fun publish(constraints: PublishConstraints = PublishConstraints.DEFAULT): LocalMedia {
         check(_localMedia.value == null) { "already publishing — call unpublish() first" }
 
         val camera = LocalCamera.create(context, factory, constraints)
         val media = LocalMedia(camera)
         _localMedia.value = media
+        // Reset the per-publish retry counter; bind a listener to surface
+        // the camera-pipeline lifecycle as RoomEvent.LocalTrack*. The
+        // listener runs on the WebRTC camera thread so we hop onto the
+        // room scope before touching SDK state / launching a retry.
+        videoRetryAttempts.set(0)
+        videoTrackFailed = false
+        camera.setVideoEventsListener(object : io.twostars.sdk.internal.LocalCamera.VideoEventsListener {
+            override fun onCaptureError(reason: String?) {
+                _events.tryEmit(RoomEvent.LocalTrackEnded(TrackKind.VIDEO, reason))
+                scope.launch { autoRetryVideoCapture(reason) }
+            }
+            override fun onCaptureRecovered() {
+                videoRetryAttempts.set(0)
+                videoTrackFailed = false
+                _events.tryEmit(RoomEvent.LocalTrackRecovered(TrackKind.VIDEO))
+            }
+        })
 
         val tracks: List<MediaStreamTrack> = listOfNotNull(camera.videoTrack, camera.audioTrack)
 
@@ -2285,6 +2466,7 @@ public class Room internal constructor(
             sfu.release()
             transport.close()
             pendingTrackQueue.clear()
+            setConnectionState(ConnectionState.DISCONNECTED)
             job.cancel()
         }
     }

@@ -126,6 +126,89 @@ public sealed class RoomEvent {
      * "Reconnecting..." UI and to pause non-essential work.
      */
     public data class VisibilityChanged(val visible: Boolean) : RoomEvent()
+
+    // --- parity with JS SDK (v0.4.4) -------------------------------------
+
+    /**
+     * Connection state transition. Mirrors `room.on('connection-state')`
+     * on the JS SDK. The same value is observable on [Room.connectionState];
+     * this event fires on each transition for apps that want to drive
+     * disclosure UI (banner, toast, retry button) off the change itself.
+     */
+    public data class ConnectionStateChanged(val state: ConnectionState) : RoomEvent()
+
+    /**
+     * A *local* camera or mic track ended unexpectedly (sensor revoked,
+     * USB camera unplugged, OS rotated the camera to another app, etc.).
+     *
+     * Fires once per (kind) when the track transitions to ENDED / stops
+     * producing frames. The SDK will attempt automatic recovery; apps
+     * can short-circuit by calling [Room.retryLocalTrack] from a
+     * "Try again" button. After successful recovery,
+     * [LocalTrackRecovered] fires; after the SDKs internal retry budget
+     * is exhausted it gives up and emits [LocalTrackFailed].
+     *
+     * Mirrors the JS SDKs `local-track-ended` event.
+     */
+    public data class LocalTrackEnded(val kind: TrackKind, val reason: String?) : RoomEvent()
+
+    /**
+     * A previously-[LocalTrackEnded] track is live again. Fires after
+     * the SDK or [Room.retryLocalTrack] successfully re-acquired the
+     * device. Mirrors the JS SDKs `local-track-recovered` event.
+     */
+    public data class LocalTrackRecovered(val kind: TrackKind) : RoomEvent()
+
+    /**
+     * The SDK gave up trying to recover a local track. Apps should
+     * surface a "Camera unavailable" / "Microphone unavailable" UI and
+     * offer manual retry via [Room.retryLocalTrack].
+     *
+     * Mirrors the JS SDKs `local-track-failed` event.
+     */
+    public data class LocalTrackFailed(val kind: TrackKind, val reason: String?) : RoomEvent()
+
+    /** A virtual background was successfully applied. Mirrors `background-ready`. */
+    public data class BackgroundReady(val mode: String, val imageUrl: String?, val prompt: String?) : RoomEvent()
+
+    /** Background application failed (image load error, GL init, etc.). Mirrors `background-error`. */
+    public data class BackgroundError(val reason: String) : RoomEvent()
+
+    /** Virtual background was cleared / disabled. Mirrors `background-cleared`. */
+    public object BackgroundCleared : RoomEvent()
+
+    /** Auto-frame mode was turned on. Mirrors `auto-frame-enabled`. */
+    public object AutoFrameEnabled : RoomEvent()
+
+    /** Auto-frame mode was turned off. Mirrors `auto-frame-disabled`. */
+    public object AutoFrameDisabled : RoomEvent()
+
+    /**
+     * The local screen share has started successfully. Mirrors
+     * `screen-share-started` on the JS SDK. Pairs with [ScreenShareEnded]
+     * - every successful start eventually fires one of each.
+     *
+     * [streamId] is the WebRTC stream identifier the SDK negotiated with
+     * the SFU. It's exposed mainly for analytics; UIs typically just
+     * bind to [Room.screenShare].
+     */
+    public data class ScreenShareStarted(val streamId: String) : RoomEvent()
+}
+
+/**
+ * Coarse transport-level state of the room's Socket.IO connection.
+ *
+ *   CONNECTING   - initial state, awaiting `authenticated`.
+ *   CONNECTED    - authenticated; signaling traffic flows.
+ *   RECONNECTING - transport dropped; underlying socket.io client
+ *                  is auto-retrying (5 attempts by default).
+ *   DISCONNECTED - permanent: either retries exhausted or [Room.leave].
+ */
+public enum class ConnectionState {
+    CONNECTING,
+    CONNECTED,
+    RECONNECTING,
+    DISCONNECTED,
 }
 
 public enum class TrackKind { AUDIO, VIDEO, SCREEN }
